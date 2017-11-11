@@ -43,37 +43,21 @@ update msg model =
                     Collapse (Starting from to)
 
                 TransitionReady ->
-                    case transition of
-                        Starting _ to ->
-                            Expand (MovingTo to)
-
-                        MovingTo _ ->
-                            model
-
-                        Done ->
-                            model
+                    model
 
                 TransitionEnd ->
                     Expand Done
 
         Collapse transition ->
             case msg of
-                Transition from to ->
-                    Expand (Starting from to)
+                Transition _ to ->
+                    Expand (MovingTo to)
 
                 TransitionReady ->
-                    case transition of
-                        Starting _ to ->
-                            Collapse (MovingTo to)
-
-                        MovingTo _ ->
-                            model
-
-                        Done ->
-                            model
+                    Collapse Done
 
                 TransitionEnd ->
-                    Collapse Done
+                    model
     , Cmd.none
     )
 
@@ -228,21 +212,12 @@ items =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    let
-        transition =
-            case model of
-                Expand transition ->
-                    transition
+    case model of
+        Collapse (Starting _ _) ->
+            AnimationFrame.times (always TransitionReady)
 
-                Collapse transition ->
-                    transition
-    in
-        case transition of
-            Starting _ _ ->
-                AnimationFrame.times (always TransitionReady)
-
-            _ ->
-                Sub.none
+        _ ->
+            Sub.none
 
 
 init : ( Model, Cmd Msg )
