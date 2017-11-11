@@ -18,46 +18,41 @@ main =
 
 
 type Model
-    = Expand Transition
-    | Collapse Transition
-
-
-type Transition
-    = Starting Int Int
-    | MovingTo Int
-    | Done
+    = CollapsingFrom Int
+    | Collapsed
+    | ExpandingTo Int
+    | Expanded
 
 
 type Msg
-    = Transition Int Int
-    | TransitionReady
-    | TransitionEnd
+    = Toggle Int -- content length in px
+    | ExpandEnd
+    | CollapseStart
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( case model of
-        Expand transition ->
-            case msg of
-                Transition from to ->
-                    Collapse (Starting from to)
+    ( case ( model, msg ) of
+        ( CollapsingFrom _, CollapseStart ) ->
+            Collapsed
 
-                TransitionReady ->
-                    model
+        ( CollapsingFrom _, Toggle _ ) ->
+            Expanded
 
-                TransitionEnd ->
-                    Expand Done
+        ( Collapsed, Toggle length ) ->
+            ExpandingTo length
 
-        Collapse transition ->
-            case msg of
-                Transition _ to ->
-                    Expand (MovingTo to)
+        ( ExpandingTo _, ExpandEnd ) ->
+            Expanded
 
-                TransitionReady ->
-                    Collapse Done
+        ( ExpandingTo _, Toggle length ) ->
+            CollapsingFrom length
 
-                TransitionEnd ->
-                    model
+        ( Expanded, Toggle length ) ->
+            CollapsingFrom length
+
+        _ ->
+            model
     , Cmd.none
     )
 
@@ -84,40 +79,40 @@ view model =
                 [ div [] (List.take previewCount itemViews)
                 , div
                     [ on "transitionend"
-                        (Json.succeed TransitionEnd)
+                        (Json.succeed ExpandEnd)
                     , style
                         [ ( "overflow", "hidden" )
                         , ( "transition", "height 0.5s" )
                         , ( "height"
                           , case model of
-                                Expand (Starting from _) ->
-                                    (toString from) ++ "px"
+                                CollapsingFrom length ->
+                                    (toString length) ++ "px"
 
-                                Collapse (Starting from _) ->
-                                    (toString from) ++ "px"
-
-                                Expand (MovingTo to) ->
-                                    (toString to) ++ "px"
-
-                                Collapse (MovingTo to) ->
-                                    (toString to) ++ "px"
-
-                                Expand Done ->
-                                    "auto"
-
-                                Collapse Done ->
+                                Collapsed ->
                                     "0"
+
+                                ExpandingTo length ->
+                                    (toString length) ++ "px"
+
+                                Expanded ->
+                                    "auto"
                           )
                         ]
                     ]
                     (List.drop previewCount itemViews)
                 ]
             , case model of
-                Collapse _ ->
-                    viewExpandButton
+                CollapsingFrom _ ->
+                    viewToggleButton "expand"
 
-                Expand _ ->
-                    viewCollapseButton
+                Collapsed ->
+                    viewToggleButton "expand"
+
+                ExpandingTo _ ->
+                    viewToggleButton "collapse"
+
+                Expanded ->
+                    viewToggleButton "collapse"
             ]
 
 
@@ -132,10 +127,10 @@ viewItem =
         << text
 
 
-viewExpandButton : Html Msg
-viewExpandButton =
+viewToggleButton : String -> Html Msg
+viewToggleButton label =
     button
-        [ on "click" decodeExpand
+        [ on "click" decodeToggleClick
         , style
             [ ( "display", "block" )
             , ( "font-size", "inherit" )
@@ -144,26 +139,11 @@ viewExpandButton =
             , ( "width", "100%" )
             ]
         ]
-        [ text "expand" ]
+        [ text label ]
 
 
-viewCollapseButton : Html Msg
-viewCollapseButton =
-    button
-        [ on "click" decodeCollapse
-        , style
-            [ ( "display", "block" )
-            , ( "font-size", "inherit" )
-            , ( "border", "1px solid #000" )
-            , ( "margin", "0" )
-            , ( "width", "100%" )
-            ]
-        ]
-        [ text "collapse" ]
-
-
-decodeExpand : Json.Decoder Msg
-decodeExpand =
+decodeToggleClick : Json.Decoder Msg
+decodeToggleClick =
     let
         domPath =
             [ "currentTarget"
@@ -173,22 +153,7 @@ decodeExpand =
             , "scrollHeight"
             ]
     in
-        Json.map (Transition 0)
-            (Json.at domPath Json.int)
-
-
-decodeCollapse : Json.Decoder Msg
-decodeCollapse =
-    let
-        domPath =
-            [ "currentTarget"
-            , "parentNode"
-            , "firstChild"
-            , "lastChild"
-            , "scrollHeight"
-            ]
-    in
-        Json.map (\from -> Transition from 0)
+        Json.map Toggle
             (Json.at domPath Json.int)
 
 
@@ -213,8 +178,8 @@ items =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        Collapse (Starting _ _) ->
-            AnimationFrame.times (always TransitionReady)
+        CollapsingFrom _ ->
+            AnimationFrame.times (always CollapseStart)
 
         _ ->
             Sub.none
@@ -222,4 +187,4 @@ subscriptions model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( Collapse Done, Cmd.none )
+    ( Collapsed, Cmd.none )
