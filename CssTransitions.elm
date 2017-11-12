@@ -78,16 +78,13 @@ view model =
             [ div []
                 [ div [] (List.take previewCount itemViews)
                 , div
-                    [ on "transitionend"
-                        (Json.at [ "currentTarget", "offsetHeight" ] Json.int
-                            |> Json.andThen
-                                (\height ->
-                                    if height > 0 then
-                                        Json.succeed ExpandEnd
-                                    else
-                                        Json.fail "Ignoring collapse transitionend"
-                                )
-                        )
+                    [ on "transitionend" <|
+                        case model of
+                            ExpandingTo _ ->
+                                Json.succeed ExpandEnd
+
+                            _ ->
+                                Json.fail "Not an expand transition"
                     , style
                         [ ( "overflow", "hidden" )
                         , ( "transition", "height 0.5s" )
