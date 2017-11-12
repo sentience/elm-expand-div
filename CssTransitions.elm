@@ -1,4 +1,4 @@
-module Main exposing (Msg, update, view, subscriptions, init)
+module CssTransitions exposing (Msg, update, view, subscriptions, init)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -79,7 +79,15 @@ view model =
                 [ div [] (List.take previewCount itemViews)
                 , div
                     [ on "transitionend"
-                        (Json.succeed ExpandEnd)
+                        (Json.at [ "currentTarget", "offsetHeight" ] Json.int
+                            |> Json.andThen
+                                (\height ->
+                                    if height > 0 then
+                                        Json.succeed ExpandEnd
+                                    else
+                                        Json.fail "Ignoring collapse transitionend"
+                                )
+                        )
                     , style
                         [ ( "overflow", "hidden" )
                         , ( "transition", "height 0.5s" )
@@ -130,7 +138,16 @@ viewItem =
 viewToggleButton : String -> Html Msg
 viewToggleButton label =
     button
-        [ on "click" decodeToggleClick
+        [ on "click" <|
+            Json.map Toggle <|
+                Json.at
+                    [ "currentTarget"
+                    , "parentNode"
+                    , "firstChild"
+                    , "lastChild"
+                    , "scrollHeight"
+                    ]
+                    Json.int
         , style
             [ ( "display", "block" )
             , ( "font-size", "inherit" )
@@ -140,21 +157,6 @@ viewToggleButton label =
             ]
         ]
         [ text label ]
-
-
-decodeToggleClick : Json.Decoder Msg
-decodeToggleClick =
-    let
-        domPath =
-            [ "currentTarget"
-            , "parentNode"
-            , "firstChild"
-            , "lastChild"
-            , "scrollHeight"
-            ]
-    in
-        Json.map Toggle
-            (Json.at domPath Json.int)
 
 
 items : List String
