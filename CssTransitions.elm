@@ -1,20 +1,10 @@
-module CssTransitions exposing (Msg, update, view, subscriptions, init)
+module CssTransitions exposing (Model, Msg, ViewConfig, init, subscriptions, update, view)
 
+import AnimationFrame
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import AnimationFrame
 import Json.Decode as Json
-
-
-main : Program Never Model Msg
-main =
-    Html.program
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        }
 
 
 type Model
@@ -57,87 +47,65 @@ update msg model =
     )
 
 
-view : Model -> Html Msg
-view model =
-    let
-        itemViews =
-            List.map viewItem items
-
-        previewCount =
-            3
-    in
-        div
-            [ style
-                [ ( "border", "1px solid #000" )
-                , ( "font", "normal 18px/2 sans-serif" )
-                , ( "margin", "0 auto" )
-                , ( "max-width", "960px" )
-                , ( "text-align", "center" )
-                ]
-            ]
-            [ div []
-                [ div [] (List.take previewCount itemViews)
-                , div
-                    [ on "transitionend" <|
-                        case model of
-                            ExpandingTo _ ->
-                                Json.succeed ExpandEnd
-
-                            _ ->
-                                Json.fail "Not an expand transition"
-                    , style
-                        [ ( "overflow", "hidden" )
-                        , ( "transition", "height 0.5s" )
-                        , ( "height"
-                          , case model of
-                                CollapsingFrom length ->
-                                    (toString length) ++ "px"
-
-                                Collapsed ->
-                                    "0"
-
-                                ExpandingTo length ->
-                                    (toString length) ++ "px"
-
-                                Expanded ->
-                                    "auto"
-                          )
-                        ]
-                    ]
-                    (List.drop previewCount itemViews)
-                ]
-            , case model of
-                CollapsingFrom _ ->
-                    viewToggleButton "expand"
-
-                Collapsed ->
-                    viewToggleButton "expand"
-
-                ExpandingTo _ ->
-                    viewToggleButton "collapse"
-
-                Expanded ->
-                    viewToggleButton "collapse"
-            ]
+type alias ViewConfig msg =
+    { previewCount : Int
+    , msgTag : Msg -> msg
+    }
 
 
-viewItem : String -> Html msg
-viewItem =
+view : ViewConfig msg -> Model -> List (Html msg) -> Html msg
+view config model itemViews =
     div
         [ style
             [ ( "border", "1px solid #000" )
+            , ( "font", "normal 18px/2 sans-serif" )
+            , ( "margin", "0 auto" )
+            , ( "max-width", "960px" )
+            , ( "text-align", "center" )
             ]
         ]
-        << List.singleton
-        << text
+        [ div []
+            [ div [] (List.take config.previewCount itemViews)
+            , div
+                [ on "transitionend" <|
+                    case model of
+                        ExpandingTo _ ->
+                            Json.succeed (config.msgTag ExpandEnd)
+
+                        _ ->
+                            Json.fail "Not an expand transition"
+                , style
+                    [ ( "overflow", "hidden" )
+                    , ( "transition", "height 0.5s" )
+                    , ( "height"
+                      , case model of
+                            CollapsingFrom length ->
+                                toString length ++ "px"
+
+                            Collapsed ->
+                                "0"
+
+                            ExpandingTo length ->
+                                toString length ++ "px"
+
+                            Expanded ->
+                                "auto"
+                      )
+                    ]
+                ]
+                (List.drop config.previewCount itemViews)
+            ]
+        , viewToggleButton model
+            |> Html.map config.msgTag
+        ]
 
 
-viewToggleButton : String -> Html Msg
-viewToggleButton label =
+viewToggleButton : Model -> Html Msg
+viewToggleButton model =
     button
-        [ on "click" <|
-            Json.map Toggle <|
-                Json.at
+        [ on "click"
+            (Json.map Toggle
+                (Json.at
                     [ "currentTarget"
                     , "parentNode"
                     , "firstChild"
@@ -145,6 +113,8 @@ viewToggleButton label =
                     , "scrollHeight"
                     ]
                     Json.int
+                )
+            )
         , style
             [ ( "display", "block" )
             , ( "font-size", "inherit" )
@@ -153,25 +123,19 @@ viewToggleButton label =
             , ( "width", "100%" )
             ]
         ]
-        [ text label ]
+        [ case model of
+            CollapsingFrom _ ->
+                text "expand"
 
+            Collapsed ->
+                text "expand"
 
-items : List String
-items =
-    [ "alpha"
-    , "beta"
-    , "charlie"
-    , "delta"
-    , "echo"
-    , "foxtrot"
-    , "golf"
-    , "hotel"
-    , "india"
-    , "juliet"
-    , "kilo"
-    , "lima"
-    , "mike"
-    ]
+            ExpandingTo _ ->
+                text "collapse"
+
+            Expanded ->
+                text "collapse"
+        ]
 
 
 subscriptions : Model -> Sub Msg

@@ -1,4 +1,4 @@
-module AnimationFrames exposing (Msg, update, view, subscriptions, init)
+module AnimationFrames exposing (Model, Msg, ViewConfig, update, view, subscriptions, init)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -6,16 +6,6 @@ import Html.Events exposing (..)
 import Animation exposing (px)
 import Animation.Messenger
 import Json.Decode as Json
-
-
-main : Program Never Model Msg
-main =
-    Html.program
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        }
 
 
 type alias Model =
@@ -90,63 +80,42 @@ update msg model =
                 ( { model | style = newStyle }, cmds )
 
 
-view : Model -> Html Msg
-view model =
-    let
-        itemViews =
-            List.map viewItem items
-
-        previewCount =
-            3
-    in
-        div
-            [ style
-                [ ( "border", "1px solid #000" )
-                , ( "font", "normal 18px/2 sans-serif" )
-                , ( "margin", "0 auto" )
-                , ( "max-width", "960px" )
-                , ( "text-align", "center" )
-                ]
-            ]
-            [ div []
-                [ div [] (List.take previewCount itemViews)
-                , div
-                    (List.concat
-                        [ Animation.render model.style
-                        , [ style
-                                [ ( "overflow", "hidden" )
-                                ]
-                          ]
-                        ]
-                    )
-                    (List.drop previewCount itemViews)
-                ]
-            , viewToggleButton <|
-                case model.state of
-                    Collapsed ->
-                        "expand"
-
-                    Expanding ->
-                        "collapse"
-
-                    Expanded ->
-                        "collapse"
-            ]
+type alias ViewConfig msg =
+    { previewCount : Int
+    , msgTag : Msg -> msg
+    }
 
 
-viewItem : String -> Html msg
-viewItem =
+view : ViewConfig msg -> Model -> List (Html msg) -> Html msg
+view config model itemViews =
     div
         [ style
             [ ( "border", "1px solid #000" )
+            , ( "font", "normal 18px/2 sans-serif" )
+            , ( "margin", "0 auto" )
+            , ( "max-width", "960px" )
+            , ( "text-align", "center" )
             ]
         ]
-        << List.singleton
-        << text
+        [ div []
+            [ div [] (List.take config.previewCount itemViews)
+            , div
+                (List.concat
+                    [ Animation.render model.style
+                    , [ style
+                            [ ( "overflow", "hidden" )
+                            ]
+                      ]
+                    ]
+                )
+                (List.drop config.previewCount itemViews)
+            ]
+        , viewToggleButton model |> Html.map config.msgTag
+        ]
 
 
-viewToggleButton : String -> Html Msg
-viewToggleButton label =
+viewToggleButton : { a | state : State } -> Html Msg
+viewToggleButton { state } =
     button
         [ on "click" <|
             Json.map Toggle <|
@@ -166,25 +135,16 @@ viewToggleButton label =
             , ( "width", "100%" )
             ]
         ]
-        [ text label ]
+        [ case state of
+            Collapsed ->
+                text "expand"
 
+            Expanding ->
+                text "collapse"
 
-items : List String
-items =
-    [ "alpha"
-    , "beta"
-    , "charlie"
-    , "delta"
-    , "echo"
-    , "foxtrot"
-    , "golf"
-    , "hotel"
-    , "india"
-    , "juliet"
-    , "kilo"
-    , "lima"
-    , "mike"
-    ]
+            Expanded ->
+                text "collapse"
+        ]
 
 
 subscriptions : Model -> Sub Msg
